@@ -2164,62 +2164,28 @@ body.light-mode .allocation-row::after {
 
         <!-- Chart Tab -->
         <section id="tab-chart" class="hidden glass-panel rounded-[32px] p-5 md:p-6 space-y-5 animate-fade-in">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div>
-                    <h2 class="text-lg md:text-xl font-black">資產分析</h2>
-                    <p class="text-xs muted font-bold mt-1">根據交易紀錄呈現精準資產變化。</p>
-                </div>
+           <div class="flex flex-row justify-between items-start gap-2 mb-2">
+    <!-- 左側：標題與日期區間 -->
+    <div class="flex flex-col gap-1">
+        <h2 class="text-lg md:text-xl font-black">資產分析</h2>
+        <div class="chart-date-inline-row !justify-start !gap-1">
+            <input type="text" id="chartStartDate" placeholder="YYYY/MM/DD" onchange="renderChart()" class="chart-date-plain !text-left !w-[82px] md:!w-[92px] !min-w-[82px]">
+            <span class="text-xs font-bold muted">~</span>
+            <input type="text" id="chartEndDate" placeholder="YYYY/MM/DD" onchange="renderChart()" class="chart-date-plain !text-left !w-[82px] md:!w-[92px] !min-w-[82px]">
+        </div>
+    </div>
 
-                <div class="chart-top-controls">
-
-    <div class="chart-first-row">
-        
-
-        <!-- 右側：基準線 -->
+    <!-- 右側：基準線控制 -->
+    <div class="flex items-center mt-0.5 md:mt-1">
         <label class="chart-benchmark-inline">
-            <input
-                id="benchmarkLineToggle"
-                type="checkbox"
-                checked
-                onchange="renderChart()"
-            >
+            <input id="benchmarkLineToggle" type="checkbox" checked onchange="renderChart()">
             <span>最大資產 ×</span>
-            <input
-                id="benchmarkLinePercent"
-                type="number"
-                min="1"
-                max="100"
-                step="1"
-                value="85"
-                onchange="renderChart()"
-                oninput="renderChart()"
-                class="benchmark-inline-input"
-            >
+            <input id="benchmarkLinePercent" type="number" min="1" max="100" step="1" value="85" onchange="renderChart()" oninput="renderChart()" class="benchmark-inline-input">
             <span>%</span>
         </label>
     </div>
-
-    <div class="chart-date-inline-row">
-        <input
-            type="text"
-            id="chartStartDate"
-            placeholder="YYYY/MM/DD"
-            onchange="renderChart()"
-            class="chart-date-plain"
-        >
-        <span>~</span>
-        <input
-            type="text"
-            id="chartEndDate"
-            placeholder="YYYY/MM/DD"
-            onchange="renderChart()"
-            class="chart-date-plain"
-        >
-    </div>
-
 </div>
 
-            </div>
 
 <div class="soft-panel rounded-3xl p-4">
 

@@ -4805,14 +4805,22 @@ if (hold.qty <= 0) {
                     txIndex++;
                 }
 
-                const stockMarketValue = calculateMarketValueFromHoldingsOnDate(state.holdings, date);
+              const stockMarketValue = calculateMarketValueFromHoldingsOnDate(state.holdings, date);
 
-                result.push({
-                    date,
-                    cash: state.cash,
-                    stockMarketValue,
-                    totalAsset: state.cash + stockMarketValue
-                });
+// 👇 新增：計算當下持股的總成本
+let totalHoldingsCost = 0;
+Object.values(state.holdings).forEach(h => {
+    if (h.qty > 0) totalHoldingsCost += Math.max(0, h.totalCost);
+});
+
+result.push({
+    date,
+    cash: state.cash,
+    stockMarketValue,
+    totalAsset: state.cash + stockMarketValue,
+    totalCost: state.cash + totalHoldingsCost // 👇 新增這行，總成本 = 現金 + 持股成本
+});
+
             });
 
             return result;
@@ -5545,6 +5553,8 @@ function initDefaultChartRange(scale) {
 const plotData = calculateAssetTimelineFast(dateTimeline);
 const labels = plotData.map(d => d.date);
 const totalAssetData = plotData.map(d => d.totalAsset);
+const totalCostData = plotData.map(d => d.totalCost); // 👇 新增這行，把總成本抽成陣列
+
 
 if (!labels.length) {
     return;
@@ -5577,7 +5587,7 @@ const benchmarkData = labels.map(() => benchmarkValue);
                 type: "line",
                 data: {
                     labels,
-                   datasets: [
+datasets: [
     {
         label: "總資產",
         data: totalAssetData,
@@ -5588,12 +5598,23 @@ const benchmarkData = labels.map(() => benchmarkValue);
         tension: 0.18,
         pointRadius: dateTimeline.length > 50 ? 0 : 2
     },
+    // 👇👇👇 新增這段「總成本」的曲線設定 👇👇👇
+    {
+        label: "總成本",
+        data: totalCostData,
+        borderColor: "#2dd4bf", // 使用青色以和總資產的藍色做區分
+        backgroundColor: "transparent",
+        fill: false,
+        borderWidth: 2,
+        borderDash: [5, 5], // 設定為虛線
+        tension: 0.18,
+        pointRadius: 0
+    },
+    // 👆👆👆 新增結束 👆👆👆
     ...(showBenchmarkLine && benchmarkValue > 0 ? [{
-       label: window.innerWidth <= 768
-    ? `對照組 ${benchmarkPercent}%`
-    : `對照組：最大資產 × ${benchmarkPercent}% (${money(benchmarkValue)})`,
-
-
+        label: window.innerWidth <= 768
+            ? `對照組 ${benchmarkPercent}%`
+            : `對照組：最大資產 × ${benchmarkPercent}% (${money(benchmarkValue)})`,
         data: benchmarkData,
         borderColor: "#ef4444",
         backgroundColor: "rgba(239, 68, 68, 0)",
@@ -5604,6 +5625,7 @@ const benchmarkData = labels.map(() => benchmarkValue);
         tension: 0
     }] : [])
 ]
+
 
                 },
 options: {

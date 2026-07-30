@@ -2173,13 +2173,7 @@ body.light-mode .allocation-row::after {
                 <div class="chart-top-controls">
 
     <div class="chart-first-row">
-        <!-- 左側：尺度切換 -->
-        <div class="chart-scale-inline">
-            <button onclick="changeChartScale('daily', this)" id="btn-scale-daily" class="chart-scale-btn tab-btn-active">日</button>
-            <button onclick="changeChartScale('weekly', this)" id="btn-scale-weekly" class="chart-scale-btn tab-btn-inactive">周</button>
-            <button onclick="changeChartScale('monthly', this)" id="btn-scale-monthly" class="chart-scale-btn tab-btn-inactive">月</button>
-            <button onclick="changeChartScale('yearly', this)" id="btn-scale-yearly" class="chart-scale-btn tab-btn-inactive">年</button>
-        </div>
+        
 
         <!-- 右側：基準線 -->
         <label class="chart-benchmark-inline">
@@ -5447,18 +5441,23 @@ function changeHistoryScale(scale, btn) {
         /* =========================
            Chart
         ========================= */
-        function generateDailyDates(startDate, endDate) {
-            const dates = [];
-            let curr = new Date(startDate);
-            const end = new Date(endDate);
+       function generateDailyDates(startDate, endDate) {
+    const dates = [];
+    let curr = new Date(startDate);
+    const end = new Date(endDate);
 
-            while (curr <= end) {
-                dates.push(curr.toISOString().split("T")[0]);
-                curr.setDate(curr.getDate() + 1);
-            }
-
-            return dates;
+    while (curr <= end) {
+        const dayOfWeek = curr.getDay();
+        // 只有不是週日(0)且不是週六(6)才加入陣列
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            dates.push(curr.toISOString().split("T")[0]);
         }
+        curr.setDate(curr.getDate() + 1);
+    }
+
+    return dates;
+}
+
 
         function generateWeeklyDates(startDate, endDate) {
             const dates = [];
@@ -5516,18 +5515,24 @@ function changeHistoryScale(scale, btn) {
             return [...new Set(dates)].sort();
         }
 
-        function initDefaultChartRange(scale) {
-            const today = new Date();
-            let start = new Date();
+function initDefaultChartRange(scale) {
+    const today = new Date();
+    let start = new Date();
+    let workingDaysCount = 0;
 
-            if (scale === "daily") start.setDate(today.getDate() - 7);
-            else if (scale === "weekly") start.setDate(today.getDate() - 56);
-            else if (scale === "monthly") start.setMonth(today.getMonth() - 6);
-            else if (scale === "yearly") start.setFullYear(today.getFullYear() - 3);
-
-            document.getElementById("chartStartDate").value = toSlashDate(start.toISOString().split("T")[0]);
-            document.getElementById("chartEndDate").value = toSlashDate(today.toISOString().split("T")[0]);
+    // 往前推算，直到湊滿 22 個工作日 (扣除週六 6、週日 0)
+    while (workingDaysCount < 22) {
+        start.setDate(start.getDate() - 1);
+        const dayOfWeek = start.getDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) { 
+            workingDaysCount++;
         }
+    }
+
+    document.getElementById("chartStartDate").value = toSlashDate(start.toISOString().split("T")[0]);
+    document.getElementById("chartEndDate").value = toSlashDate(today.toISOString().split("T")[0]);
+}
+
 
         function changeChartScale(scale, btn) {
             currentChartScale = scale;
@@ -5635,38 +5640,52 @@ const benchmarkData = labels.map(() => benchmarkValue);
 ]
 
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            labels: {
-                                color: "#cbd5e1",
-                                font: { size: 11, weight: "bold" }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            grid: { color: "rgba(51, 65, 85, 0.45)" },
-                            ticks: {
-                                color: "#94a3b8",
-                                callback: value => "$ " + Number(value).toLocaleString("zh-TW")
-                            }
-                        },
-                        x: {
-    grid: { display: false },
-    ticks: {
-        color: "#94a3b8",
-        maxRotation: window.innerWidth <= 768 ? 45 : 0,
-        minRotation: window.innerWidth <= 768 ? 45 : 0,
-        autoSkip: true,
-        maxTicksLimit: window.innerWidth <= 768 ? 4 : 8
+options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: {
+            labels: {
+                color: "#cbd5e1",
+                font: { size: 11, weight: "bold" }
+            }
+        },
+        // 👇 新增 tooltip 設定，讓點擊/懸停時顯示完整日期與金額
+        tooltip: {
+            callbacks: {
+                title: function(context) {
+                    return context[0].label; // 顯示完整日期
+                },
+                label: function(context) {
+                    let label = context.dataset.label || '';
+                    if (label) label += ': ';
+                    if (context.parsed.y !== null) {
+                        label += "$ " + Number(context.parsed.y).toLocaleString("zh-TW"); // 顯示完整金額
+                    }
+                    return label;
+                }
+            }
+        }
+    },
+    scales: {
+        y: {
+            grid: { color: "rgba(51, 65, 85, 0.45)" },
+            ticks: {
+                color: "#94a3b8",
+                // 👇 Y軸改為顯示 K (除以 1000 加上 K)
+                callback: value => "$ " + (value / 1000) + "K"
+            }
+        },
+        x: {
+            grid: { display: false },
+            ticks: {
+                // 👇 隱藏 X 軸日期
+                display: false 
+            }
+        }
     }
 }
 
-                    }
-                }
             });
         }
 function isLeveragedEtfSymbol(symbol) {

@@ -316,3 +316,39 @@ function jsonResponse(statusCode, body) {
     body: JSON.stringify(body)
   };
 }
+// 判斷現在是否為台灣股市盤中 (09:00 - 13:35)
+function isMarketOpen() {
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Taipei" }));
+  const day = now.getDay();
+  // 週末不抓 Yahoo
+  if (day === 0 || day === 6) return false; 
+  
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const time = hours * 100 + minutes;
+  
+  // 09:00 到 13:35 (包含盤後零股緩衝時間)
+  return time >= 900 && time <= 1335;
+}
+
+// 呼叫 Yahoo Finance API
+async function fetchYahooQuote(symbol, market) {
+  // 根據上市/上櫃加上正確的後綴
+  const suffix = market === "otc" ? ".TWO" : ".TW";
+  const yahooSymbol = `${symbol}${suffix}`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1m&range=1d`;
+  
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": getUserAgent() }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    // 取得 Yahoo 的即時價格
+    const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+    return Number.isFinite(price) ? price : null;
+  } catch (e) {
+    console.error(`Yahoo API 失敗 (${yahooSymbol}):`, e.message);
+    return null;
+  }
+}

@@ -19,17 +19,23 @@ exports.handler = async function(event) {
     const results = await fetchTwseMisQuotes(symbols);
 
     // ==========================================
-    // 【新增】：盤中時間，如果證交所沒有即時成交價，改用 Yahoo 補上
+    // 【優化】：盤中時間，如果證交所有缺 Z 值，用 Yahoo 批次補上
     // ==========================================
     if (isMarketOpen()) {
-      const fallbackPromises = Object.values(results).map(async (item) => {
-        // 如果證交所沒有給 Z 值 (isRealtimePrice 為 false)
-        if (!item.isRealtimePrice) {
-          const yahooPrice = await fetchYahooQuote(item.symbol, item.market);
+      // 1. 找出所有沒有即時成交價的股票
+      const missingItems = Object.values(results).filter(item => !item.isRealtimePrice);
+
+      if (missingItems.length > 0) {
+        // 2. 一次性向 Yahoo 發送批次請求
+        const yahooPrices = await fetchYahooQuotesBatch(missingItems);
+
+        // 3. 將拿到的 Yahoo 價格更新回 results
+        missingItems.forEach(item => {
+          const yahooPrice = yahooPrices[item.symbol];
           if (yahooPrice) {
             item.price = yahooPrice;
             item.currentPrice = yahooPrice;
-            item.z = yahooPrice;
+            item.z = yahooPrice; // 把 Yahoo 價格當作 z 值
             item.priceType = "yahoo";
             item.isRealtimePrice = true;
             item.source = "Yahoo Finance";
@@ -40,9 +46,8 @@ exports.handler = async function(event) {
               item.changePercent = (item.change / item.yesterday) * 100;
             }
           }
-        }
-      });
-      await Promise.all(fallbackPromises); // 平行處理，加快速度
+        });
+      }
     }
     // ==========================================
 
@@ -60,6 +65,7 @@ exports.handler = async function(event) {
     });
   }
 };
+
 
 function normalizeSymbol(symbol) {
   return String(symbol || "")
@@ -272,23 +278,41 @@ function isMarketOpen() {
 }
 
 // ==========================================
-// 【新增】：呼叫 Yahoo Finance API 抓取即時價格
+// 【優化】：呼叫 Yahoo Finance API 批次抓取即時價格
 // ==========================================
-async function fetchYahooQuote(symbol, market) {
-  const suffix = market === "otc" ? ".TWO" : ".TW";
-  const yahooSymbol = `${symbol}${suffix}`;
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1m&range=1d`;
+async function fetchYahooQuotesBatch(missingItems) {
+  if (missingItems.length === 0) return {};
+
+  // 組合 Yahoo 格式的代號，例如: "2330.TW,8069.TWO"
+  const yahooSymbols = missingItems.map(item => 
+    `${item.symbol}${item.market === "otc" ? ".TWO" : ".TW"}`
+  ).join(",");
+
+  // 使用 v7 的 quote endpoint 來支援批次查詢
+  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${yahooSymbols}`;
   
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": getUserAgent() }
     });
-    if (!res.ok) return null;
+    if (!res.ok) return {};
+    
     const data = await res.json();
-    const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-    return Number.isFinite(price) ? price : null;
+    const resultMap = {};
+    
+    // 解析回傳結果
+    const results = data?.quoteResponse?.result || [];
+    results.forEach(quote => {
+      // 將 Yahoo 代號轉回台股代號 (去掉 .TW / .TWO)
+      const cleanSymbol = quote.symbol.replace(".TW", "").replace(".TWO", "");
+      if (quote.regularMarketPrice) {
+        resultMap[cleanSymbol] = quote.regularMarketPrice;
+      }
+    });
+
+    return resultMap;
   } catch (e) {
-    console.error(`Yahoo API 失敗 (${yahooSymbol}):`, e.message);
-    return null;
+    console.error("Yahoo Batch API 失敗:", e.message);
+    return {};
   }
 }

@@ -5596,21 +5596,20 @@ datasets: [
         fill: true,
         borderWidth: 2,
         tension: 0.18,
-        pointRadius: dateTimeline.length > 50 ? 0 : 2
+        pointRadius: dateTimeline.length > 50 ? 0 : 3, // 藍色線上的實心點
+        pointBackgroundColor: "#3b82f6"
     },
-    // 👇👇👇 新增這段「總成本」的曲線設定 👇👇👇
     {
         label: "總成本",
         data: totalCostData,
-        borderColor: "#2dd4bf", // 使用青色以和總資產的藍色做區分
+        borderColor: "#2dd4bf", 
         backgroundColor: "transparent",
         fill: false,
         borderWidth: 2,
-        borderDash: [5, 5], // 設定為虛線
+
         tension: 0.18,
         pointRadius: 0
     },
-    // 👆👆👆 新增結束 👆👆👆
     ...(showBenchmarkLine && benchmarkValue > 0 ? [{
         label: window.innerWidth <= 768
             ? `對照組 ${benchmarkPercent}%`
@@ -5619,12 +5618,13 @@ datasets: [
         borderColor: "#ef4444",
         backgroundColor: "rgba(239, 68, 68, 0)",
         borderWidth: 2,
-        borderDash: [6, 6],
+
         pointRadius: 0,
         fill: false,
         tension: 0
     }] : [])
 ]
+
 
 
                 },
@@ -5635,7 +5635,11 @@ options: {
         legend: {
             labels: {
                 color: "#cbd5e1",
-                font: { size: 11, weight: "bold" }
+                font: { size: 11, weight: "bold" },
+                // 👇 加入以下三行，強制圖例變成圓點
+                usePointStyle: true,
+                pointStyle: 'circle',
+                boxWidth: 8
             }
         },
         // 👇 新增 tooltip 設定，讓點擊/懸停時顯示完整日期與金額

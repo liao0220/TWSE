@@ -18,6 +18,53 @@ exports.handler = async function(event) {
 
     const results = await fetchTwseMisQuotes(symbols);
 
+    exports.handler = async function(event) {
+  try {
+    const symbolsParam = event.queryStringParameters?.symbols || "";
+    // ... (中間省略，維持原樣) ...
+
+    const results = await fetchTwseMisQuotes(symbols);
+
+    // ==========================================
+    // 【新增】：盤中 Yahoo 備援邏輯
+    // ==========================================
+    if (isMarketOpen()) {
+      // 使用 Promise.all 平行抓取，加快速度
+      const fallbackPromises = Object.values(results).map(async (item) => {
+        // 如果證交所沒有即時成交價 (z)
+        if (!item.isRealtimePrice) {
+          const yahooPrice = await fetchYahooQuote(item.symbol, item.market);
+          if (yahooPrice) {
+            item.price = yahooPrice;
+            item.currentPrice = yahooPrice;
+            item.z = yahooPrice; // 把 Yahoo 價格當作 z 值
+            item.priceType = "yahoo";
+            item.isRealtimePrice = true;
+            item.source = "Yahoo Finance";
+            
+            // 重新計算漲跌幅
+            if (item.yesterday > 0) {
+              item.change = item.price - item.yesterday;
+              item.changePercent = (item.change / item.yesterday) * 100;
+            }
+          }
+        }
+      });
+      await Promise.all(fallbackPromises); // 等待所有 Yahoo API 抓取完成
+    }
+    // ==========================================
+
+    return jsonResponse(200, {
+      ok: true,
+      source: "TWSE MIS",
+      updatedAt: new Date().toISOString(),
+      data: results
+    });
+
+  } catch (error) {
+    // ... (維持原樣)
+
+
     return jsonResponse(200, {
       ok: true,
       source: "TWSE MIS",

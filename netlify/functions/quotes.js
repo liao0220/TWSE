@@ -19,37 +19,6 @@ exports.handler = async function(event) {
     const results = await fetchTwseMisQuotes(symbols);
 
     // ==========================================
-    // 【優化】：盤中時間，如果證交所有缺 Z 值，用 Yahoo 批次補上
-    // ==========================================
-    if (isMarketOpen()) {
-      // 1. 找出所有沒有即時成交價的股票
-      const missingItems = Object.values(results).filter(item => !item.isRealtimePrice);
-
-      if (missingItems.length > 0) {
-        // 2. 一次性向 Yahoo 發送批次請求
-        const yahooPrices = await fetchYahooQuotesBatch(missingItems);
-
-        // 3. 將拿到的 Yahoo 價格更新回 results
-        missingItems.forEach(item => {
-          const yahooPrice = yahooPrices[item.symbol];
-          if (yahooPrice) {
-            item.price = yahooPrice;
-            item.currentPrice = yahooPrice;
-            item.z = yahooPrice; // 把 Yahoo 價格當作 z 值
-            item.priceType = "yahoo";
-            item.isRealtimePrice = true;
-            item.source = "Yahoo Finance";
-            
-            // 重新計算漲跌幅
-            if (item.yesterday > 0) {
-              item.change = item.price - item.yesterday;
-              item.changePercent = (item.change / item.yesterday) * 100;
-            }
-          }
-        });
-      }
-    }
-    // ==========================================
 
     return jsonResponse(200, {
       ok: true,
@@ -158,19 +127,29 @@ function parseTwseMisItem(item) {
   const ask = parseFirstOrderPrice(item.a);
   const bid = parseFirstOrderPrice(item.b);
 
-  let price = null;
+    let price = null;
   let priceType = "none";
   let isRealtimePrice = false;
 
   if (Number.isFinite(z) && z > 0) {
+    // 有最近成交價，就用 z
     price = z;
     priceType = "last";
     isRealtimePrice = true;
+
+  } else if (Number.isFinite(bid) && bid > 0) {
+    // 沒有 z，就用最佳買價 bid
+    price = bid;
+    priceType = "bid";
+    isRealtimePrice = true;
+
   } else if (Number.isFinite(y) && y > 0) {
+    // 連 bid 都沒有，最後才用昨收
     price = y;
     priceType = "yesterday";
     isRealtimePrice = false;
   }
+
 
   let change = null;
   let changePercent = null;
